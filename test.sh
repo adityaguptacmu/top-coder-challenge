@@ -53,7 +53,7 @@ echo "Running script with --debug to get trace and result..."
 
 # --- 3. Run the Calculation and Extract Result ---
 # Run with --debug and capture the full output
-DEBUG_OUTPUT=$(python3 calculate_reimbursement.py "$TRIP_DURATION" "$MILES_TRAVELED" "$RECEIPTS_AMOUNT" --debug)
+DEBUG_OUTPUT=$(python3 reimburse.py "$TRIP_DURATION" "$MILES_TRAVELED" "$RECEIPTS_AMOUNT" --debug)
 
 # Extract the final reimbursement value from the last line of the trace.
 # The line looks like: "FINAL: Total reimbursement: $123.45"

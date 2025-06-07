@@ -8,67 +8,45 @@ REIMBURSEMENT_RATES = {
     # Base Rates
     "PER_DIEM_RATE": 100.00,
 
-    # Mileage Tiers
-    "MILEAGE_TIER1_THRESHOLD": 100.0,
-    "MILEAGE_RATE_TIER1": 0.58,
-    "MILEAGE_RATE_TIER2": 0.45,
-
-    # Receipt Reimbursement
-    "RECEIPT_REIMBURSEMENT_BASE_RATE": 0.6,
-    "RECEIPT_DIMINISHING_RETURN_FACTOR": 0.001,
-
-    # Optimal Daily Spending Thresholds (from interviews)
-    "OPTIMAL_SPENDING_SHORT_TRIP_DAYS": 3,
-    "OPTIMAL_SPENDING_SHORT_TRIP_MAX": 75.0,
-    "OPTIMAL_SPENDING_MEDIUM_TRIP_DAYS": 6,
-    "OPTIMAL_SPENDING_MEDIUM_TRIP_MAX": 120.0,
-    "OPTIMAL_SPENDING_LONG_TRIP_MAX": 90.0,
-
-    # Bonuses (fixed days, tunable amounts)
-    "CENTS_BONUS_CENTS": [49, 99],
-    "CENTS_BONUS_AMOUNT": 5.01,
-    "FIVE_DAY_TRIP_BONUS_DAYS": 5,
-    "FIVE_DAY_TRIP_BONUS_AMOUNT": 50.0,
-    "MILES_PER_DAY_EFFICIENCY_SWEET_SPOT_MIN": 180,
-    "MILES_PER_DAY_EFFICIENCY_SWEET_SPOT_MAX": 220,
-    "MILES_PER_DAY_EFFICIENCY_BONUS": 75.0,
-
-    # Penalties
-    "LOW_RECEIPT_PENALTY_TRIP_DAYS": 2,
-    "LOW_RECEIPT_PENALTY_THRESHOLD": 30.0,
-    "LOW_RECEIPT_PENALTY_AMOUNT": 75.0,
-    "HIGH_SPENDING_PENALTY_PERCENT": 0.15,
-
-    # Key Interaction Effects / Trip Profiles (fixed days, tunable bonuses/penalties)
-    "SWEET_SPOT_COMBO_DAYS": 5,
-    "SWEET_SPOT_COMBO_MILES_PER_DAY": 180,
-    "SWEET_SPOT_COMBO_SPENDING_PER_DAY": 100.0,
-    "SWEET_SPOT_COMBO_BONUS": 200.0,
-    "VACATION_PENALTY_DAYS": 8,
-    "VACATION_PENALTY_SPENDING_THRESHOLD_FACTOR": 1.2,  # More restrictive than normal long trip threshold
-    "VACATION_PENALTY_AMOUNT": 250.0,
-
-
-        "MILEAGE_TIER1_THRESHOLD": 87.3242,
+    # Mileage Tiers (optimized values)
+    "MILEAGE_TIER1_THRESHOLD": 87.3242,
     "MILEAGE_RATE_TIER1": 0.4000,
     "MILEAGE_RATE_TIER2": 0.3788,
+
+    # Receipt Reimbursement (optimized values)
     "RECEIPT_REIMBURSEMENT_BASE_RATE": 0.4659,
     "RECEIPT_DIMINISHING_RETURN_FACTOR": 0.0001,
+
+    # Optimal Daily Spending Thresholds (optimized values)
+    "OPTIMAL_SPENDING_SHORT_TRIP_DAYS": 3,
     "OPTIMAL_SPENDING_SHORT_TRIP_MAX": 75.0000,
+    "OPTIMAL_SPENDING_MEDIUM_TRIP_DAYS": 6,
     "OPTIMAL_SPENDING_MEDIUM_TRIP_MAX": 120.0000,
     "OPTIMAL_SPENDING_LONG_TRIP_MAX": 90.0000,
+
+    # Bonuses (optimized values)
+    "CENTS_BONUS_CENTS": [49, 99],
     "CENTS_BONUS_AMOUNT": 1,
+    "FIVE_DAY_TRIP_BONUS_DAYS": 5,
     "FIVE_DAY_TRIP_BONUS_AMOUNT": 76.6963,
+    "FOUR_DAY_TRIP_BONUS_AMOUNT": 25.0,
+    "SIX_DAY_TRIP_BONUS_AMOUNT": 25.0,
     "MILES_PER_DAY_EFFICIENCY_SWEET_SPOT_MIN": 180.0000,
     "MILES_PER_DAY_EFFICIENCY_SWEET_SPOT_MAX": 220.0000,
     "MILES_PER_DAY_EFFICIENCY_BONUS": 90.2941,
+
+    # Penalties (optimized values)
     "LOW_RECEIPT_PENALTY_TRIP_DAYS": 2,
     "LOW_RECEIPT_PENALTY_THRESHOLD": 30.0000,
     "LOW_RECEIPT_PENALTY_AMOUNT": 57.9780,
     "HIGH_SPENDING_PENALTY_PERCENT": 0.0500,
+
+    # Key Interaction Effects / Trip Profiles (optimized values)
+    "SWEET_SPOT_COMBO_DAYS": 5,
     "SWEET_SPOT_COMBO_MILES_PER_DAY": 180.0000,
     "SWEET_SPOT_COMBO_SPENDING_PER_DAY": 100.0000,
     "SWEET_SPOT_COMBO_BONUS": 194.7575,
+    "VACATION_PENALTY_DAYS": 8,
     "VACATION_PENALTY_SPENDING_THRESHOLD_FACTOR": 1.2000,
     "VACATION_PENALTY_AMOUNT": 400.0000,
 }
@@ -134,6 +112,16 @@ def calculate_reimbursement(trip_duration_days, miles_traveled, total_receipts_a
             bonus = R["FIVE_DAY_TRIP_BONUS_AMOUNT"]
             total_reimbursement += bonus
             debug_log.append(f"BONUS: Standard 5-Day Trip. +${bonus:.2f}")
+
+        # 4-Day and 6-Day Trip Bonuses (sweet spot range)
+        if trip_duration_days == 4:
+            bonus = R["FOUR_DAY_TRIP_BONUS_AMOUNT"]
+            total_reimbursement += bonus
+            debug_log.append(f"BONUS: 4-Day Trip (sweet spot range). +${bonus:.2f}")
+        elif trip_duration_days == 6:
+            bonus = R["SIX_DAY_TRIP_BONUS_AMOUNT"]
+            total_reimbursement += bonus
+            debug_log.append(f"BONUS: 6-Day Trip (sweet spot range). +${bonus:.2f}")
 
         # Mileage Efficiency Bonus
         if R["MILES_PER_DAY_EFFICIENCY_SWEET_SPOT_MIN"] <= miles_per_day <= R["MILES_PER_DAY_EFFICIENCY_SWEET_SPOT_MAX"]:
