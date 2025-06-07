@@ -178,7 +178,7 @@ def main():
         args=(data, REIMBURSEMENT_RATES),
         method='L-BFGS-B',  # A good choice that supports bounds
         bounds=bounds,
-        options={'disp': True, 'maxiter': 500, 'ftol': 1e-9} # Increased maxiter and adjusted tolerance
+        options={'disp': True, 'maxiter': 5000, 'ftol': 1e-9} # Increased maxiter and adjusted tolerance
     )
 
     if result.success:

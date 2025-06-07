@@ -45,8 +45,32 @@ REIMBURSEMENT_RATES = {
     "SWEET_SPOT_COMBO_SPENDING_PER_DAY": 100.0,
     "SWEET_SPOT_COMBO_BONUS": 200.0,
     "VACATION_PENALTY_DAYS": 8,
-    "VACATION_PENALTY_SPENDING_THRESHOLD_FACTOR": 1.0,
+    "VACATION_PENALTY_SPENDING_THRESHOLD_FACTOR": 1.2,  # More restrictive than normal long trip threshold
     "VACATION_PENALTY_AMOUNT": 250.0,
+
+
+        "MILEAGE_TIER1_THRESHOLD": 87.3242,
+    "MILEAGE_RATE_TIER1": 0.4000,
+    "MILEAGE_RATE_TIER2": 0.3788,
+    "RECEIPT_REIMBURSEMENT_BASE_RATE": 0.4659,
+    "RECEIPT_DIMINISHING_RETURN_FACTOR": 0.0001,
+    "OPTIMAL_SPENDING_SHORT_TRIP_MAX": 75.0000,
+    "OPTIMAL_SPENDING_MEDIUM_TRIP_MAX": 120.0000,
+    "OPTIMAL_SPENDING_LONG_TRIP_MAX": 90.0000,
+    "CENTS_BONUS_AMOUNT": 1,
+    "FIVE_DAY_TRIP_BONUS_AMOUNT": 76.6963,
+    "MILES_PER_DAY_EFFICIENCY_SWEET_SPOT_MIN": 180.0000,
+    "MILES_PER_DAY_EFFICIENCY_SWEET_SPOT_MAX": 220.0000,
+    "MILES_PER_DAY_EFFICIENCY_BONUS": 90.2941,
+    "LOW_RECEIPT_PENALTY_TRIP_DAYS": 2,
+    "LOW_RECEIPT_PENALTY_THRESHOLD": 30.0000,
+    "LOW_RECEIPT_PENALTY_AMOUNT": 57.9780,
+    "HIGH_SPENDING_PENALTY_PERCENT": 0.0500,
+    "SWEET_SPOT_COMBO_MILES_PER_DAY": 180.0000,
+    "SWEET_SPOT_COMBO_SPENDING_PER_DAY": 100.0000,
+    "SWEET_SPOT_COMBO_BONUS": 194.7575,
+    "VACATION_PENALTY_SPENDING_THRESHOLD_FACTOR": 1.2000,
+    "VACATION_PENALTY_AMOUNT": 400.0000,
 }
 
 
@@ -87,26 +111,25 @@ def calculate_reimbursement(trip_duration_days, miles_traveled, total_receipts_a
 
     # --- 4. Bonuses and Penalties based on Trip Profile ---
     # These are applied to the subtotal.
-    # The logic checks for major profiles first ("Sweet Spot" or "Vacation"), as these
-    # seem to override standard bonus/penalty calculations.
+    # Check for major penalty profile first, as it overrides most bonuses
 
-    # Profile: "Sweet Spot Combo" (Guaranteed Bonus)
-    if (trip_duration_days == R["SWEET_SPOT_COMBO_DAYS"] and
-        miles_per_day >= R["SWEET_SPOT_COMBO_MILES_PER_DAY"] and
-        spending_per_day < R["SWEET_SPOT_COMBO_SPENDING_PER_DAY"]):
-        bonus = R["SWEET_SPOT_COMBO_BONUS"]
-        total_reimbursement += bonus
-        debug_log.append(f"BONUS: 'Sweet Spot Combo' profile triggered. +${bonus:.2f}")
-
-    # Profile: "Vacation Penalty" (Guaranteed Penalty)
-    elif (trip_duration_days >= R["VACATION_PENALTY_DAYS"] and
+    # Profile: "Vacation Penalty" (Guaranteed Penalty - overrides most bonuses)
+    if (trip_duration_days >= R["VACATION_PENALTY_DAYS"] and
           spending_per_day > (R["OPTIMAL_SPENDING_LONG_TRIP_MAX"] * R["VACATION_PENALTY_SPENDING_THRESHOLD_FACTOR"])):
         penalty = R["VACATION_PENALTY_AMOUNT"]
         total_reimbursement -= penalty
         debug_log.append(f"PENALTY: 'Vacation Penalty' profile triggered. -${penalty:.2f}")
 
-    else: # Apply standard bonuses/penalties if major profiles don't match
-        # 5-Day Trip Bonus
+    else: # Apply bonuses if not in vacation penalty territory
+        # Profile: "Sweet Spot Combo" (Guaranteed Bonus - can stack with other bonuses)
+        if (trip_duration_days == R["SWEET_SPOT_COMBO_DAYS"] and
+            miles_per_day >= R["SWEET_SPOT_COMBO_MILES_PER_DAY"] and
+            spending_per_day < R["SWEET_SPOT_COMBO_SPENDING_PER_DAY"]):
+            bonus = R["SWEET_SPOT_COMBO_BONUS"]
+            total_reimbursement += bonus
+            debug_log.append(f"BONUS: 'Sweet Spot Combo' profile triggered. +${bonus:.2f}")
+
+        # 5-Day Trip Bonus (can apply even with Sweet Spot Combo)
         if trip_duration_days == R["FIVE_DAY_TRIP_BONUS_DAYS"]:
             bonus = R["FIVE_DAY_TRIP_BONUS_AMOUNT"]
             total_reimbursement += bonus
