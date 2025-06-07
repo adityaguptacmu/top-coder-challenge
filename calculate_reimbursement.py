@@ -49,6 +49,10 @@ REIMBURSEMENT_RATES = {
     "VACATION_PENALTY_DAYS": 8,
     "VACATION_PENALTY_SPENDING_THRESHOLD_FACTOR": 1.2000,
     "VACATION_PENALTY_AMOUNT": 400.0000,
+
+    # Adjustment constants for better alignment with test cases (from reimburse.py)
+    "PER_DAY_ADJUSTMENT": 8.9233,  # Small per-day bonus to align with test cases
+    "LONG_TRIP_DEDUCTION": 150.00,  # Deduction for trips >7 days without vacation penalty
 }
 
 
@@ -63,6 +67,17 @@ def calculate_reimbursement(trip_duration_days, miles_traveled, total_receipts_a
     # Avoid division by zero for 0-day trips
     miles_per_day = miles_traveled / trip_duration_days if trip_duration_days > 0 else 0
     spending_per_day = total_receipts_amount / trip_duration_days if trip_duration_days > 0 else 0
+
+    # Determine spending limits early for use in multiple calculations
+    is_short_trip = trip_duration_days <= R["OPTIMAL_SPENDING_SHORT_TRIP_DAYS"]
+    is_medium_trip = R["OPTIMAL_SPENDING_SHORT_TRIP_DAYS"] < trip_duration_days <= R["OPTIMAL_SPENDING_MEDIUM_TRIP_DAYS"]
+    spending_limit = 0
+    if is_short_trip:
+        spending_limit = R["OPTIMAL_SPENDING_SHORT_TRIP_MAX"]
+    elif is_medium_trip:
+        spending_limit = R["OPTIMAL_SPENDING_MEDIUM_TRIP_MAX"]
+    else: # Long trip
+        spending_limit = R["OPTIMAL_SPENDING_LONG_TRIP_MAX"]
 
     debug_log.append(f"INIT: Trip Duration: {trip_duration_days} days, Miles: {miles_traveled}, Receipts: ${total_receipts_amount:.2f}")
     debug_log.append(f"INIT: Miles/Day: {miles_per_day:.2f}, Spending/Day: ${spending_per_day:.2f}")
@@ -89,24 +104,30 @@ def calculate_reimbursement(trip_duration_days, miles_traveled, total_receipts_a
 
     # --- 4. Bonuses and Penalties based on Trip Profile ---
     # These are applied to the subtotal.
-    # Check for major penalty profile first, as it overrides most bonuses
+    # Check for major penalty profile first, but allow sweet spot bonus to stack
 
-    # Profile: "Vacation Penalty" (Guaranteed Penalty - overrides most bonuses)
+    # Track if vacation penalty applies
+    vacation_penalty_applied = False
+
+    # Profile: "Vacation Penalty" (Guaranteed Penalty - overrides most bonuses except sweet spot)
     if (trip_duration_days >= R["VACATION_PENALTY_DAYS"] and
           spending_per_day > (R["OPTIMAL_SPENDING_LONG_TRIP_MAX"] * R["VACATION_PENALTY_SPENDING_THRESHOLD_FACTOR"])):
         penalty = R["VACATION_PENALTY_AMOUNT"]
         total_reimbursement -= penalty
+        vacation_penalty_applied = True
         debug_log.append(f"PENALTY: 'Vacation Penalty' profile triggered. -${penalty:.2f}")
 
-    else: # Apply bonuses if not in vacation penalty territory
-        # Profile: "Sweet Spot Combo" (Guaranteed Bonus - can stack with other bonuses)
-        if (trip_duration_days == R["SWEET_SPOT_COMBO_DAYS"] and
-            miles_per_day >= R["SWEET_SPOT_COMBO_MILES_PER_DAY"] and
-            spending_per_day < R["SWEET_SPOT_COMBO_SPENDING_PER_DAY"]):
-            bonus = R["SWEET_SPOT_COMBO_BONUS"]
-            total_reimbursement += bonus
-            debug_log.append(f"BONUS: 'Sweet Spot Combo' profile triggered. +${bonus:.2f}")
+    # Apply bonuses (sweet spot can apply even with vacation penalty, others cannot)
+    # Profile: "Sweet Spot Combo" (Guaranteed Bonus - can stack with other bonuses)
+    if (trip_duration_days == R["SWEET_SPOT_COMBO_DAYS"] and
+        miles_per_day >= R["SWEET_SPOT_COMBO_MILES_PER_DAY"] and
+        spending_per_day < R["SWEET_SPOT_COMBO_SPENDING_PER_DAY"]):
+        bonus = R["SWEET_SPOT_COMBO_BONUS"]
+        total_reimbursement += bonus
+        debug_log.append(f"BONUS: 'Sweet Spot Combo' profile triggered. +${bonus:.2f}")
 
+    # Apply other bonuses only if vacation penalty is not triggered
+    if not vacation_penalty_applied:
         # 5-Day Trip Bonus (can apply even with Sweet Spot Combo)
         if trip_duration_days == R["FIVE_DAY_TRIP_BONUS_DAYS"]:
             bonus = R["FIVE_DAY_TRIP_BONUS_AMOUNT"]
@@ -129,24 +150,22 @@ def calculate_reimbursement(trip_duration_days, miles_traveled, total_receipts_a
             total_reimbursement += bonus
             debug_log.append(f"BONUS: Mileage Efficiency in sweet spot ({miles_per_day:.2f} miles/day). +${bonus:.2f}")
 
-        # High Spending Penalty
-        is_short_trip = trip_duration_days <= R["OPTIMAL_SPENDING_SHORT_TRIP_DAYS"]
-        is_medium_trip = R["OPTIMAL_SPENDING_SHORT_TRIP_DAYS"] < trip_duration_days <= R["OPTIMAL_SPENDING_MEDIUM_TRIP_DAYS"]
-        high_spending = False
-        if is_short_trip and spending_per_day > R["OPTIMAL_SPENDING_SHORT_TRIP_MAX"]:
-            high_spending = True
-            debug_log.append(f"INFO: High daily spending detected for short trip.")
-        elif is_medium_trip and spending_per_day > R["OPTIMAL_SPENDING_MEDIUM_TRIP_MAX"]:
-            high_spending = True
-            debug_log.append(f"INFO: High daily spending detected for medium trip.")
-        elif not is_short_trip and not is_medium_trip and spending_per_day > R["OPTIMAL_SPENDING_LONG_TRIP_MAX"]:
-            high_spending = True
-            debug_log.append(f"INFO: High daily spending detected for long trip.")
+    # High Spending Penalty (applies regardless of vacation penalty)
+    high_spending = False
+    if is_short_trip and spending_per_day > R["OPTIMAL_SPENDING_SHORT_TRIP_MAX"]:
+        high_spending = True
+        debug_log.append(f"INFO: High daily spending detected for short trip.")
+    elif is_medium_trip and spending_per_day > R["OPTIMAL_SPENDING_MEDIUM_TRIP_MAX"]:
+        high_spending = True
+        debug_log.append(f"INFO: High daily spending detected for medium trip.")
+    elif not is_short_trip and not is_medium_trip and spending_per_day > R["OPTIMAL_SPENDING_LONG_TRIP_MAX"]:
+        high_spending = True
+        debug_log.append(f"INFO: High daily spending detected for long trip.")
 
-        if high_spending:
-            penalty_amount = total_reimbursement * R["HIGH_SPENDING_PENALTY_PERCENT"]
-            total_reimbursement -= penalty_amount
-            debug_log.append(f"PENALTY: High daily spending penalty applied. -${penalty_amount:.2f}")
+    if high_spending:
+        penalty_amount = total_reimbursement * R["HIGH_SPENDING_PENALTY_PERCENT"]
+        total_reimbursement -= penalty_amount
+        debug_log.append(f"PENALTY: High daily spending penalty applied. -${penalty_amount:.2f}")
 
     # --- 5. Final Adjustments (apply universally) ---
 
@@ -163,6 +182,18 @@ def calculate_reimbursement(trip_duration_days, miles_traveled, total_receipts_a
         bonus = R["CENTS_BONUS_AMOUNT"]
         total_reimbursement += bonus
         debug_log.append(f"BONUS: Receipt cents value is {cents}. +${bonus:.2f}")
+
+    # Adjustment for long trips without vacation penalty
+    if trip_duration_days > 7 and not vacation_penalty_applied:
+        deduction = R["LONG_TRIP_DEDUCTION"]
+        total_reimbursement -= deduction
+        debug_log.append(f"ADJUSTMENT: Long trip (>{7} days) without vacation penalty. -${deduction:.2f}")
+
+    # Per-day adjustment to align with test cases (not applied to vacation-like trips)
+    if not vacation_penalty_applied:
+        adjustment_bonus = trip_duration_days * R["PER_DAY_ADJUSTMENT"]
+        total_reimbursement += adjustment_bonus
+        debug_log.append(f"ADJUSTMENT: Per-day alignment bonus: {trip_duration_days} days * ${R['PER_DAY_ADJUSTMENT']:.4f}/day = +${adjustment_bonus:.2f}")
 
     # --- Finalization ---
     final_reimbursement = max(0, total_reimbursement)
